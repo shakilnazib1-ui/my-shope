@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>লগইন — নূর মডেস্ট শপ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Serif+Bengali:wght@600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: {
+      colors: { gold: "#e7c875", cream: "#faf6ee" },
+      fontFamily: { sans: ["Hind Siliguri", "sans-serif"], display: ["Noto Serif Bengali", "serif"] }
+    } } };
+  </script>
+</head>
+<body class="bg-cream text-emerald-950 font-sans">
+  <div id="header"></div>
+  <main class="max-w-md mx-auto px-4 pt-12">
+    <form id="f" class="bg-white rounded-2xl shadow-sm p-7 space-y-4">
+      <h1 class="font-display text-2xl font-bold">লগইন করুন</h1>
+      <div><label class="text-sm font-medium">ইমেইল</label>
+        <input name="email" type="email" required autocomplete="email" class="mt-1 w-full px-3 py-2 rounded-lg border border-emerald-900/20 focus:outline-none focus:ring-2 focus:ring-emerald-700"></div>
+      <div><label class="text-sm font-medium">পাসওয়ার্ড</label>
+        <input name="password" type="password" required autocomplete="current-password" class="mt-1 w-full px-3 py-2 rounded-lg border border-emerald-900/20 focus:outline-none focus:ring-2 focus:ring-emerald-700"></div>
+      <button id="btn" class="w-full bg-emerald-900 text-white py-3 rounded-full font-semibold hover:bg-emerald-800 disabled:opacity-50">লগইন</button>
+      <p class="text-sm text-center">অ্যাকাউন্ট নেই? <a href="register.html" class="text-emerald-800 font-semibold underline">সাইন আপ করুন</a></p>
+    </form>
+  </main>
+  <div id="footer"></div>
+  <script src="js/app.js"></script>
+  <script>
+    if (Auth.token) location.href = "index.html";
+    $("#f").onsubmit = async (e) => {
+      e.preventDefault();
+      const f = new FormData(e.target), btn = $("#btn"); btn.disabled = true;
+      try {
+        const data = await api("/auth/login", { method: "POST", body: { email: f.get("email"), password: f.get("password") } });
+        Auth.set(data);
+        const next = sessionStorage.getItem("after_login");
+        sessionStorage.removeItem("after_login");
+        location.href = next || "index.html";
+      } catch (err) { toast(err.message, "err"); btn.disabled = false; }
+    };
+  </script>
+</body>
+</html>

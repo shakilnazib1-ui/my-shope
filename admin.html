@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>অ্যাডমিন প্যানেল — নূর মডেস্ট শপ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Serif+Bengali:wght@600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: {
+      colors: { gold: "#e7c875", cream: "#faf6ee" },
+      fontFamily: { sans: ["Hind Siliguri", "sans-serif"], display: ["Noto Serif Bengali", "serif"] }
+    } } };
+  </script>
+</head>
+<body class="bg-cream text-emerald-950 font-sans">
+  <div id="header"></div>
+  <main class="max-w-6xl mx-auto px-4 pt-8">
+    <h1 class="font-display text-2xl font-bold mb-5">অ্যাডমিন প্যানেল</h1>
+    <div class="flex gap-2 mb-6">
+      <button id="t-orders" class="px-5 py-2 rounded-full border text-sm font-medium">অর্ডার</button>
+      <button id="t-products" class="px-5 py-2 rounded-full border text-sm font-medium">পণ্য</button>
+    </div>
+    <div id="view"></div>
+  </main>
+  <div id="footer"></div>
+  <script src="js/app.js"></script>
+  <script>
+    const STATUSES = { pending: "অপেক্ষমাণ", confirmed: "নিশ্চিত", shipped: "পাঠানো হয়েছে", delivered: "পৌঁছেছে", cancelled: "বাতিল" };
+    const inp = "w-full px-3 py-2 rounded-lg border border-emerald-900/20 focus:outline-none focus:ring-2 focus:ring-emerald-700";
+    let cats = [], tab = "orders";
+
+    function setTab(t) {
+      tab = t;
+      ["orders", "products"].forEach(k => $("#t-" + k).className =
+        "px-5 py-2 rounded-full border text-sm font-medium " + (k === t ? "bg-emerald-900 text-white border-emerald-900" : "bg-white border-emerald-900/20"));
+      t === "orders" ? showOrders() : showProducts();
+    }
+
+    async function showOrders() {
+      $("#view").innerHTML = "লোড হচ্ছে…";
+      try {
+        const orders = await api("/admin/orders", { auth: true });
+        if (!orders.length) { $("#view").innerHTML = `<p class="text-emerald-900/60">কোনো অর্ডার নেই।</p>`; return; }
+        $("#view").innerHTML = `<div class="space-y-3">${orders.map(o => `
+          <div class="bg-white rounded-xl p-4 shadow-sm">
+            <div class="flex flex-wrap justify-between gap-3 items-center">
+              <div><b>অর্ডার #${o.id}</b> · ${esc(o.full_name)} · ${esc(o.phone)}
+                <div class="text-xs text-emerald-900/60">${esc(o.address)}</div></div>
+              <div class="flex items-center gap-3">
+                <b>${money(o.total)}</b>
+                <select data-oid="${o.id}" class="st px-3 py-1.5 rounded-lg border border-emerald-900/20 text-sm">
+                  ${Object.entries(STATUSES).map(([k, v]) => `<option value="${k}" ${k === o.status ? "selected" : ""}>${v}</option>`).join("")}
+                </select>
+              </div>
+            </div>
+            <div class="text-sm text-emerald-900/80 mt-2">${o.items.map(i => `${esc(i.product_name)}${i.size ? " (" + esc(i.size) + ")" : ""} × ${i.quantity}`).join(" · ")}</div>
+          </div>`).join("")}</div>`;
+        $$(".st").forEach(s => s.onchange = async () => {
+          try { await api("/admin/orders/" + s.dataset.oid, { method: "PATCH", auth: true, body: { status: s.value } }); toast("স্ট্যাটাস আপডেট হয়েছে"); }
+          catch (e) { toast(e.message, "err"); }
+        });
+      } catch (e) { $("#view").innerHTML = `<p class="text-red-600">${esc(e.message)}</p>`; }
+    }
+
+    async function showProducts(edit = null) {
+      const list = await api("/products");
+      $("#view").innerHTML = `
+      <div class="grid lg:grid-cols-3 gap-6">
+        <form id="pf" class="bg-white rounded-2xl p-5 shadow-sm space-y-3 h-fit">
+          <h2 class="font-display font-bold">${edit ? "পণ্য সম্পাদনা" : "নতুন পণ্য"}</h2>
+          <input name="name" required placeholder="পণ্যের নাম" class="${inp}" value="${esc(edit?.name || "")}">
+          <textarea name="description" rows="3" placeholder="বিবরণ" class="${inp}">${esc(edit?.description || "")}</textarea>
+          <div class="grid grid-cols-2 gap-3">
+            <input name="price" type="number" step="0.01" min="1" required placeholder="দাম (৳)" class="${inp}" value="${edit?.price ?? ""}">
+            <input name="stock" type="number" min="0" required placeholder="স্টক" class="${inp}" value="${edit?.stock ?? ""}">
+          </div>
+          <input name="sizes" placeholder="সাইজ (কমা দিয়ে: M,L,XL)" class="${inp}" value="${esc(edit?.sizes || "")}">
+          <input name="image_url" placeholder="ছবির লিংক (URL)" class="${inp}" value="${esc(edit?.image_url || "")}">
+          <select name="category_id" class="${inp}">
+            ${cats.map(c => `<option value="${c.id}" ${edit?.category?.id === c.id ? "selected" : ""}>${esc(c.name)}</option>`).join("")}
+          </select>
+          <div class="flex gap-2">
+            <button class="flex-1 bg-emerald-900 text-white py-2.5 rounded-full font-semibold">${edit ? "আপডেট করুন" : "যোগ করুন"}</button>
+            ${edit ? '<button type="button" id="cancel" class="px-4 border rounded-full">বাতিল</button>' : ""}
+          </div>
+        </form>
+        <div class="lg:col-span-2 space-y-2">${list.map(p => `
+          <div class="bg-white rounded-xl p-3 flex items-center gap-3 shadow-sm">
+            <div class="w-14 h-16 rounded-lg overflow-hidden bg-emerald-50 shrink-0">${imgTag(p, "w-full h-full object-cover")}</div>
+            <div class="flex-1 min-w-0"><div class="font-semibold truncate">${esc(p.name)}</div>
+              <div class="text-xs text-emerald-900/60">${esc(p.category?.name || "")} · স্টক ${p.stock} · ${money(p.price)}</div></div>
+            <button data-edit="${p.id}" class="text-sm text-emerald-800 hover:underline">এডিট</button>
+            <button data-del="${p.id}" class="text-sm text-red-600 hover:underline">মুছুন</button>
+          </div>`).join("")}</div>
+      </div>`;
+
+      $("#pf").onsubmit = async (e) => {
+        e.preventDefault();
+        const f = new FormData(e.target);
+        const body = {
+          name: f.get("name"), description: f.get("description"), price: +f.get("price"), stock: +f.get("stock"),
+          sizes: f.get("sizes"), image_url: f.get("image_url"), category_id: +f.get("category_id"), is_active: true,
+        };
+        try {
+          await api(edit ? "/admin/products/" + edit.id : "/admin/products", { method: edit ? "PUT" : "POST", auth: true, body });
+          toast(edit ? "আপডেট হয়েছে" : "পণ্য যোগ হয়েছে"); showProducts();
+        } catch (err) { toast(err.message, "err"); }
+      };
+      $("#cancel")?.addEventListener("click", () => showProducts());
+      $$("[data-edit]").forEach(b => b.onclick = () => { showProducts(list.find(p => p.id === +b.dataset.edit)); window.scrollTo({ top: 0, behavior: "smooth" }); });
+      $$("[data-del]").forEach(b => b.onclick = async () => {
+        if (!confirm("এই পণ্যটি দোকান থেকে সরিয়ে ফেলবেন?")) return;
+        try { await api("/admin/products/" + b.dataset.del, { method: "DELETE", auth: true }); toast("সরানো হয়েছে"); showProducts(); }
+        catch (e) { toast(e.message, "err"); }
+      });
+    }
+
+    (async () => {
+      if (!requireLogin()) return;
+      const u = Auth.user;
+      if (!u?.is_admin) { $("#view").innerHTML = `<p class="text-red-600">এই পেজ শুধু অ্যাডমিনের জন্য।</p>`; return; }
+      try { cats = await api("/categories"); } catch (e) { toast(e.message, "err"); }
+      $("#t-orders").onclick = () => setTab("orders");
+      $("#t-products").onclick = () => setTab("products");
+      setTab("orders");
+    })();
+  </script>
+</body>
+</html>

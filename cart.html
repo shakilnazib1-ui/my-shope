@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>কার্ট — নূর মডেস্ট শপ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Serif+Bengali:wght@600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: {
+      colors: { gold: "#e7c875", cream: "#faf6ee" },
+      fontFamily: { sans: ["Hind Siliguri", "sans-serif"], display: ["Noto Serif Bengali", "serif"] }
+    } } };
+  </script>
+</head>
+<body class="bg-cream text-emerald-950 font-sans">
+  <div id="header"></div>
+  <main class="max-w-6xl mx-auto px-4 pt-8">
+    <h1 class="font-display text-2xl font-bold mb-6">আপনার কার্ট</h1>
+    <div id="content"></div>
+  </main>
+  <div id="footer"></div>
+  <script src="js/app.js"></script>
+  <script>
+    const DELIVERY = 100; // ডেলিভারি চার্জ (শুধু দেখানোর জন্য, আসল মোট সার্ভার হিসাব করে)
+
+    function render() {
+      const items = Cart.items;
+      if (!items.length) {
+        $("#content").innerHTML = `<div class="text-center py-20 bg-white rounded-2xl">
+          <div class="text-5xl mb-3">🛒</div><p class="mb-5 text-emerald-900/70">আপনার কার্ট খালি</p>
+          <a href="index.html#products" class="bg-emerald-900 text-white px-6 py-3 rounded-full">কেনাকাটা করুন</a></div>`;
+        return;
+      }
+      const u = Auth.user;
+      $("#content").innerHTML = `
+      <div class="grid lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 space-y-3">
+          ${items.map((i, idx) => `
+          <div class="bg-white rounded-xl p-3 flex gap-4 items-center shadow-sm">
+            <div class="w-20 h-24 rounded-lg overflow-hidden bg-emerald-50 shrink-0">${imgTag(i, "w-full h-full object-cover")}</div>
+            <div class="flex-1 min-w-0">
+              <div class="font-semibold truncate">${esc(i.name)}</div>
+              ${i.size ? `<div class="text-xs text-emerald-800/70">সাইজ: ${esc(i.size)}</div>` : ""}
+              <div class="text-emerald-800 font-bold mt-1">${money(i.price)}</div>
+              <div class="flex items-center gap-3 mt-2">
+                <div class="flex items-center border border-emerald-900/20 rounded-lg text-sm">
+                  <button data-dec="${idx}" class="px-3 py-1">−</button>
+                  <span class="px-2">${i.quantity}</span>
+                  <button data-inc="${idx}" class="px-3 py-1">+</button>
+                </div>
+                <button data-rm="${idx}" class="text-xs text-red-600 hover:underline">সরান</button>
+              </div>
+            </div>
+            <div class="font-bold hidden sm:block">${money(i.price * i.quantity)}</div>
+          </div>`).join("")}
+        </div>
+
+        <form id="checkout" class="bg-white rounded-2xl p-5 shadow-sm h-fit space-y-3">
+          <h2 class="font-display text-lg font-bold">অর্ডারের তথ্য</h2>
+          <input name="full_name" required placeholder="আপনার নাম" value="${esc(u?.name || "")}" class="w-full px-3 py-2 rounded-lg border border-emerald-900/20 focus:outline-none focus:ring-2 focus:ring-emerald-700">
+          <input name="phone" required placeholder="মোবাইল নম্বর" value="${esc(u?.phone || "")}" class="w-full px-3 py-2 rounded-lg border border-emerald-900/20 focus:outline-none focus:ring-2 focus:ring-emerald-700">
+          <textarea name="address" required rows="3" placeholder="পূর্ণ ঠিকানা (জেলা, থানা, এলাকা)" class="w-full px-3 py-2 rounded-lg border border-emerald-900/20 focus:outline-none focus:ring-2 focus:ring-emerald-700"></textarea>
+          <div class="text-sm bg-emerald-50 rounded-lg p-3">💵 পেমেন্ট: ক্যাশ অন ডেলিভারি</div>
+          <div class="border-t pt-3 text-sm space-y-1">
+            <div class="flex justify-between"><span>সাবটোটাল</span><span>${money(Cart.total)}</span></div>
+            <div class="flex justify-between text-emerald-800/70"><span>ডেলিভারি (আনুমানিক)</span><span>${money(DELIVERY)}</span></div>
+            <div class="flex justify-between font-bold text-base pt-1"><span>মোট</span><span>${money(Cart.total + DELIVERY)}</span></div>
+          </div>
+          <button id="place" class="w-full bg-gold text-emerald-950 py-3 rounded-full font-bold hover:brightness-110 disabled:opacity-50">
+            ${Auth.token ? "অর্ডার নিশ্চিত করুন" : "লগইন করে অর্ডার করুন"}</button>
+        </form>
+      </div>`;
+
+      $$("[data-inc]").forEach(b => b.onclick = () => { Cart.setQty(+b.dataset.inc, items[+b.dataset.inc].quantity + 1); render(); });
+      $$("[data-dec]").forEach(b => b.onclick = () => { Cart.setQty(+b.dataset.dec, items[+b.dataset.dec].quantity - 1); render(); });
+      $$("[data-rm]").forEach(b => b.onclick = () => { Cart.remove(+b.dataset.rm); render(); });
+      $("#checkout").onsubmit = submit;
+    }
+
+    async function submit(e) {
+      e.preventDefault();
+      if (!requireLogin()) return;
+      const f = new FormData(e.target);
+      const btn = $("#place"); btn.disabled = true;
+      try {
+        await api("/orders", { method: "POST", auth: true, body: {
+          full_name: f.get("full_name"), phone: f.get("phone"), address: f.get("address"),
+          payment_method: "cod",
+          items: Cart.items.map(i => ({ product_id: i.product_id, quantity: i.quantity, size: i.size || null })),
+        }});
+        Cart.clear();
+        $("#content").innerHTML = `<div class="text-center py-20 bg-white rounded-2xl">
+          <div class="text-5xl mb-3">✅</div>
+          <h2 class="font-display text-xl font-bold mb-2">অর্ডার সফল হয়েছে!</h2>
+          <p class="text-emerald-900/70 mb-5">আমরা শীঘ্রই আপনার সাথে যোগাযোগ করব।</p>
+          <a href="orders.html" class="bg-emerald-900 text-white px-6 py-3 rounded-full">আমার অর্ডার দেখুন</a></div>`;
+      } catch (err) {
+        toast(err.message, "err"); btn.disabled = false;
+        if (!Auth.token) location.href = "login.html";
+      }
+    }
+    render();
+  </script>
+</body>
+</html>

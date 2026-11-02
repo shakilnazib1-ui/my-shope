@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>পণ্যের বিবরণ — নূর মডেস্ট শপ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Serif+Bengali:wght@600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: {
+      colors: { gold: "#e7c875", cream: "#faf6ee" },
+      fontFamily: { sans: ["Hind Siliguri", "sans-serif"], display: ["Noto Serif Bengali", "serif"] }
+    } } };
+  </script>
+</head>
+<body class="bg-cream text-emerald-950 font-sans">
+  <div id="header"></div>
+  <main class="max-w-6xl mx-auto px-4 pt-8">
+    <a href="index.html#products" class="text-sm text-emerald-800 hover:underline">← সব পণ্য</a>
+    <div id="box" class="mt-4"><div class="h-96 rounded-2xl bg-emerald-900/10 animate-pulse"></div></div>
+  </main>
+  <div id="footer"></div>
+  <script src="js/app.js"></script>
+  <script>
+    const id = new URLSearchParams(location.search).get("id");
+    let product, size = "", qty = 1;
+
+    function view() {
+      const p = product;
+      const sizes = (p.sizes || "").split(",").map(s => s.trim()).filter(Boolean);
+      if (sizes.length && !size) size = sizes[0];
+      const out = p.stock <= 0;
+      $("#box").innerHTML = `
+      <div class="grid md:grid-cols-2 gap-8 bg-white rounded-2xl p-4 md:p-8 shadow-sm">
+        <div class="aspect-[4/5] rounded-xl overflow-hidden bg-emerald-50">${imgTag(p, "w-full h-full object-cover")}</div>
+        <div class="flex flex-col">
+          ${p.category ? `<span class="text-xs text-emerald-700 bg-emerald-50 self-start px-3 py-1 rounded-full">${esc(p.category.name)}</span>` : ""}
+          <h1 class="font-display text-2xl md:text-3xl font-bold mt-3">${esc(p.name)}</h1>
+          <div class="text-3xl font-bold text-emerald-800 mt-3">${money(p.price)}</div>
+          <p class="mt-4 text-emerald-900/80 leading-relaxed whitespace-pre-line">${esc(p.description || "")}</p>
+
+          ${sizes.length ? `
+          <div class="mt-6"><div class="text-sm font-semibold mb-2">সাইজ</div>
+            <div class="flex flex-wrap gap-2">${sizes.map(s => `
+              <button data-size="${esc(s)}" class="size-btn min-w-[3rem] px-4 py-2 rounded-lg border text-sm font-medium
+                ${s === size ? "bg-emerald-900 text-white border-emerald-900" : "bg-white border-emerald-900/20 hover:bg-emerald-50"}">${esc(s)}</button>`).join("")}
+            </div></div>` : ""}
+
+          <div class="mt-6 flex items-center gap-4">
+            <div class="flex items-center border border-emerald-900/20 rounded-lg overflow-hidden bg-white">
+              <button id="dec" class="px-4 py-2 hover:bg-emerald-50">−</button>
+              <span id="qty" class="px-4 min-w-[2.5rem] text-center">${qty}</span>
+              <button id="inc" class="px-4 py-2 hover:bg-emerald-50">+</button>
+            </div>
+            <span class="text-sm ${out ? "text-red-600" : "text-emerald-700"}">${out ? "স্টক শেষ" : "স্টকে আছে: " + p.stock + "টি"}</span>
+          </div>
+
+          <div class="mt-8 flex gap-3">
+            <button id="add" ${out ? "disabled" : ""} class="flex-1 bg-emerald-900 text-white py-3 rounded-full font-semibold hover:bg-emerald-800 disabled:opacity-40 disabled:cursor-not-allowed">কার্টে যোগ করুন</button>
+            <button id="buy" ${out ? "disabled" : ""} class="flex-1 bg-gold text-emerald-950 py-3 rounded-full font-semibold hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed">এখনই কিনুন</button>
+          </div>
+        </div>
+      </div>`;
+
+      $$(".size-btn").forEach(b => b.onclick = () => { size = b.dataset.size; view(); });
+      $("#dec").onclick = () => { qty = Math.max(1, qty - 1); view(); };
+      $("#inc").onclick = () => { qty = Math.min(p.stock || 1, qty + 1); view(); };
+      $("#add").onclick = () => { Cart.add(p, size, qty); toast("কার্টে যোগ হয়েছে ✓"); };
+      $("#buy").onclick = () => { Cart.add(p, size, qty); location.href = "cart.html"; };
+    }
+
+    (async () => {
+      try {
+        if (!id) throw new Error("পণ্য নির্বাচন করা হয়নি");
+        product = await api("/products/" + encodeURIComponent(id));
+        document.title = product.name + " — নূর মডেস্ট শপ";
+        view();
+      } catch (e) {
+        $("#box").innerHTML = `<div class="text-center py-20 text-emerald-900/70">${esc(e.message)}</div>`;
+      }
+    })();
+  </script>
+</body>
+</html>

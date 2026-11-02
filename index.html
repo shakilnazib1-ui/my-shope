@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>নূর মডেস্ট শপ — পাঞ্জাবি ও বোরকা</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Serif+Bengali:wght@600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: {
+      colors: { gold: "#e7c875", cream: "#faf6ee" },
+      fontFamily: { sans: ["Hind Siliguri", "sans-serif"], display: ["Noto Serif Bengali", "serif"] }
+    } } };
+  </script>
+</head>
+<body class="bg-cream text-emerald-950 font-sans">
+  <div id="header"></div>
+
+  <!-- Hero -->
+  <section class="bg-emerald-950 text-white relative overflow-hidden">
+    <div class="absolute inset-0 opacity-10" style="background-image:radial-gradient(#e7c875 1px,transparent 1px);background-size:22px 22px"></div>
+    <div class="max-w-6xl mx-auto px-4 py-16 md:py-24 relative grid md:grid-cols-2 gap-10 items-center">
+      <div>
+        <p class="text-gold tracking-widest text-sm mb-3">নতুন কালেকশন</p>
+        <h1 class="font-display text-4xl md:text-5xl font-bold leading-tight">শালীনতায় <span class="text-gold">সৌন্দর্য</span>,<br>আরামে আভিজাত্য</h1>
+        <p class="mt-5 text-emerald-100/80 max-w-md">খাঁটি কাপড়ে তৈরি পাঞ্জাবি ও বোরকার সেরা সংগ্রহ। ঘরে বসেই অর্ডার করুন, ক্যাশ অন ডেলিভারিতে।</p>
+        <div class="mt-7 flex gap-3">
+          <a href="#products" class="bg-gold text-emerald-950 font-semibold px-6 py-3 rounded-full hover:brightness-110">কেনাকাটা শুরু করুন</a>
+          <a href="register.html" class="border border-gold/60 text-gold px-6 py-3 rounded-full hover:bg-gold/10">অ্যাকাউন্ট খুলুন</a>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-4" id="hero-cats">
+        <button data-cat="panjabi" class="cat-tile rounded-2xl bg-emerald-900/60 border border-gold/30 p-8 text-center hover:bg-emerald-900 transition">
+          <div class="text-5xl mb-2">👘</div><div class="font-display text-xl">পাঞ্জাবি</div>
+        </button>
+        <button data-cat="borka" class="cat-tile rounded-2xl bg-emerald-900/60 border border-gold/30 p-8 text-center hover:bg-emerald-900 transition mt-8">
+          <div class="text-5xl mb-2">🧕</div><div class="font-display text-xl">বোরকা</div>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Products -->
+  <main id="products" class="max-w-6xl mx-auto px-4 pt-12 scroll-mt-20">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      <h2 class="font-display text-2xl font-bold">আমাদের পণ্য</h2>
+      <div class="flex flex-wrap gap-2 items-center">
+        <input id="search" type="search" placeholder="পণ্য খুঁজুন…" class="px-4 py-2 rounded-full border border-emerald-900/20 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-700 w-full sm:w-56">
+        <select id="sort" class="px-3 py-2 rounded-full border border-emerald-900/20 bg-white">
+          <option value="">নতুন আগে</option>
+          <option value="price_asc">দাম: কম থেকে বেশি</option>
+          <option value="price_desc">দাম: বেশি থেকে কম</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="tabs" class="flex gap-2 mb-8 overflow-x-auto pb-1"></div>
+    <div id="grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6"></div>
+    <p id="empty" class="hidden text-center text-emerald-900/60 py-16">কোনো পণ্য পাওয়া যায়নি।</p>
+  </main>
+
+  <div id="footer"></div>
+  <script src="js/app.js"></script>
+  <script>
+    let activeCat = "";
+    const grid = $("#grid"), empty = $("#empty");
+
+    async function loadTabs() {
+      try {
+        const cats = await api("/categories");
+        const all = [{ slug: "", name: "সব" }, ...cats];
+        $("#tabs").innerHTML = all.map(c => `
+          <button data-slug="${esc(c.slug)}" class="tab shrink-0 px-5 py-2 rounded-full border text-sm font-medium transition
+            ${c.slug === activeCat ? "bg-emerald-900 text-white border-emerald-900" : "bg-white border-emerald-900/20 hover:bg-emerald-50"}">
+            ${esc(c.name)}</button>`).join("");
+        $$(".tab").forEach(b => b.onclick = () => { activeCat = b.dataset.slug; loadTabs(); loadProducts(); });
+      } catch (e) { toast(e.message, "err"); }
+    }
+
+    async function loadProducts() {
+      grid.innerHTML = Array(8).fill('<div class="aspect-[4/5] rounded-2xl bg-emerald-900/10 animate-pulse"></div>').join("");
+      empty.classList.add("hidden");
+      const params = new URLSearchParams();
+      if (activeCat) params.set("category", activeCat);
+      if ($("#search").value.trim()) params.set("q", $("#search").value.trim());
+      if ($("#sort").value) params.set("sort", $("#sort").value);
+      try {
+        const list = await api("/products?" + params);
+        grid.innerHTML = list.map(productCard).join("");
+        empty.classList.toggle("hidden", list.length > 0);
+      } catch (e) {
+        grid.innerHTML = "";
+        empty.textContent = e.message;
+        empty.classList.remove("hidden");
+      }
+    }
+
+    let t;
+    $("#search").addEventListener("input", () => { clearTimeout(t); t = setTimeout(loadProducts, 350); });
+    $("#sort").addEventListener("change", loadProducts);
+    $$(".cat-tile").forEach(b => b.onclick = () => {
+      activeCat = b.dataset.cat; loadTabs(); loadProducts();
+      $("#products").scrollIntoView({ behavior: "smooth" });
+    });
+
+    loadTabs(); loadProducts();
+  </script>
+</body>
+</html>
